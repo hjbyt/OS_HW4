@@ -23,9 +23,6 @@ typedef int bool;
 // Exit with an error message
 #define ERROR(...) error(EXIT_FAILURE, errno, __VA_ARGS__)
 
-//TODO: what to do if the program is finished (EOL is received),
-// and there is a background process running?
-
 //
 // Globals
 //
