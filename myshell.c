@@ -25,7 +25,6 @@ typedef int bool;
 
 //TODO: what to do if the program is finished (EOL is received),
 // and there is a background process running?
-//TODO: exit "cleanly" ? (replace calls to exits with closing handles and return 0)
 
 //
 // Globals
@@ -138,6 +137,8 @@ int run_piped(char** arglist1, char** arglist2)
 	// Fork first child
 	pid_t pid1 = fork();
 	if (pid1 == -1) {
+		close(pipefd[0]);
+		close(pipefd[1]);
 		ERROR("fork failed");
 	} else if (pid1 == 0) {
 		// This is the child process 1
@@ -148,6 +149,8 @@ int run_piped(char** arglist1, char** arglist2)
 
 		// Replace stdout with the pipe writing end
 		if (dup2(pipefd[1], STDOUT_FILENO) == -1) {
+			close(pipefd[0]);
+			close(pipefd[1]);
 			ERROR("dup2 on stdout failed");
 		}
 		// Close unneeded pipe fds
@@ -166,6 +169,8 @@ int run_piped(char** arglist1, char** arglist2)
 	// Fork second child
 	pid_t pid2 = fork();
 	if (pid2 == -1) {
+		close(pipefd[0]);
+		close(pipefd[1]);
 		ERROR("fork failed");
 	} else if (pid2 == 0) {
 		// This is the child process
@@ -176,6 +181,8 @@ int run_piped(char** arglist1, char** arglist2)
 
 		// Replace stdin with the pipe reading end
 		if (dup2(pipefd[0], STDIN_FILENO) == -1) {
+			close(pipefd[0]);
+			close(pipefd[1]);
 			ERROR("dup2 on stdin failed");
 		}
 		// Close unneeded pipe fds
