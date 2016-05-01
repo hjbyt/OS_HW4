@@ -31,13 +31,7 @@ int process_arglist(int count, char** arglist)
 {
 	// TODO: try "killing zombies" by calling waitpid(-1, NULL, WNOHANG) repeatedly ?
 
-	bool run_in_background = FALSE;
-	if (strncmp("&", arglist[count - 1], 1) == 0) {
-		arglist[count - 1] = NULL;
-		count -= 1;
-		run_in_background = TRUE;
-	}
-
+	// Check if this a piped command, and if so run it as such.
 	for (int i = 0; i < count; ++i)
 	{
 		char* token = arglist[i];
@@ -47,7 +41,44 @@ int process_arglist(int count, char** arglist)
 		}
 	}
 
+	// we have a normal/background command
+
+	// Check if the command should run in background
+	bool run_in_background = FALSE;
+	if (strncmp("&", arglist[count - 1], 1) == 0) {
+		arglist[count - 1] = NULL;
+		count -= 1;
+		run_in_background = TRUE;
+	}
+
+	// run it
 	return run(arglist, run_in_background);
+}
+
+int run(char** arglist, bool run_in_background)
+{
+	pid_t pid = fork();
+	if (pid == -1) {
+		ERROR("fork failed");
+	} else if (pid == 0) {
+		// This is the child process
+		execvp(arglist[0], arglist);
+		// Note: if execvp returned, it surely failed and returned -1,
+		// hence no need to check it's return value.
+		ERROR("Error in executing command %s", arglist[0]);
+	}
+	assert(pid != 0);
+	// This is the parent process.
+
+	if (!run_in_background) {
+		if (waitpid(pid, NULL, 0) == -1) {
+			ERROR("waiting on child failed");
+		}
+	} else {
+		//TODO: ???
+	}
+
+	return 1;
 }
 
 int run_piped(char** arglist1, char** arglist2)
@@ -107,28 +138,3 @@ int run_piped(char** arglist1, char** arglist2)
 	return 1;
 }
 
-int run(char** arglist, bool run_in_background)
-{
-	pid_t pid = fork();
-	if (pid == -1) {
-		ERROR("fork failed");
-	} else if (pid == 0) {
-		// This is the child process
-		execvp(arglist[0], arglist);
-		// Note: if execvp returned, it surely failed and returned -1,
-		// hence no need to check it's return value.
-		ERROR("Error in executing command %s", arglist[0]);
-	}
-	assert(pid != 0);
-	// This is the parent process.
-
-	if (!run_in_background) {
-		if (waitpid(pid, NULL, 0) == -1) {
-			ERROR("waiting on child failed");
-		}
-	} else {
-		//TODO: ???
-	}
-
-	return 1;
-}
