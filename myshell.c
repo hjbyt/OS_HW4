@@ -49,6 +49,9 @@ void restore_int_signal_handler();
 int process_arglist(int count, char** arglist)
 // Process and execute the command line given by arglist.
 {
+	//NOTE: this call is NOP after the first command.
+	register_chld_signal_handler();
+
 	// Check if this a piped command, and if so run it as such.
 	for (int i = 0; i < count; ++i)
 	{
@@ -106,7 +109,9 @@ int run(char** arglist, bool run_in_background)
 
 	// If needed, wait for child to finish.
 	if (!run_in_background) {
-		if (waitpid(pid, NULL, 0) == -1) {
+		// Note: ECHILD error might occur if the signal handler already waited on the child process.
+		// In that case it's not an error.
+		if (waitpid(pid, NULL, 0) == -1 && errno != ECHILD) {
 			ERROR("waiting on child failed");
 		}
 		// Unsuppress SIGINTs
@@ -200,10 +205,12 @@ int run_piped(char** arglist1, char** arglist2)
 	close(pipefd[1]);
 
 	// Wait for children to finish
-	if (waitpid(pid1, NULL, 0) == -1) {
+	// Note: ECHILD error might occur if the signal handler already waited on the child process.
+	// In that case it's not an error.
+	if (waitpid(pid1, NULL, 0) == -1 && errno != ECHILD) {
 		ERROR("waiting on child failed (%s)", arglist1[0]);
 	}
-	if (waitpid(pid2, NULL, 0) == -1) {
+	if (waitpid(pid2, NULL, 0) == -1 && errno != ECHILD) {
 		ERROR("waiting on child failed (%s)", arglist2[0]);
 	}
 
@@ -225,9 +232,6 @@ void register_chld_signal_handler()
 	}
 
 	struct sigaction child_sigaction;
-	//NOTE: SIG_IGN has a special behavior for SIGCHLD,
-	// that makes runtime automatically reap children zombie processes for us.
-	// Alternatively, a function the loops over wait() with WNOHANG could be registered.
 	child_sigaction.sa_handler = SIG_IGN;
 	if (sigemptyset(&child_sigaction.sa_mask) == -1) {
 		ERROR("Error calling sigemptyset");
